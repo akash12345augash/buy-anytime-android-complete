@@ -11,34 +11,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check Android project
-        run: |
-          echo "Checking project structure..."
-          find . -maxdepth 3 -type f | sort
-
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
+      - name: Extract Buy Anytime ZIP
+        run: |
+          echo "ZIP files found:"
+          find . -maxdepth 2 -type f -name "*.zip"
+
+          ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No ZIP file found"
+            exit 1
+          fi
+
+          echo "Extracting: $ZIP_FILE"
+          mkdir -p extracted
+          unzip -q "$ZIP_FILE" -d extracted
+
+          echo "Extracted files:"
+          find extracted -maxdepth 4 -type f | head -100
+
+      - name: Find Android project
+        run: |
+          SETTINGS=$(find extracted -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -1)
+
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: settings.gradle not found inside ZIP"
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
+
+          echo "Android project found at:"
+          echo "$PROJECT_DIR"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
       - name: Install Gradle
         run: |
           curl -L https://services.gradle.org/distributions/gradle-8.11.1-bin.zip -o /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d "$HOME"
           echo "$HOME/gradle-8.11.1/bin" >> "$GITHUB_PATH"
-
-      - name: Find Android project
-        run: |
-          PROJECT=$(find . -name settings.gradle -o -name settings.gradle.kts | head -1)
-          if [ -z "$PROJECT" ]; then
-            echo "ERROR: settings.gradle not found"
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$PROJECT")
-          echo "Android project: $PROJECT_DIR"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Build APK and AAB
         run: |
